@@ -15,6 +15,7 @@ from torch.autograd import Variable
 from layers import *
 from attention import *
 from transformer import *
+from torchtext.legacy import data
 
 def make_model(src_vocab, tgt_vocab, N=6, 
                d_model=512, d_ff=2048, h=8, dropout=0.1):
@@ -35,7 +36,7 @@ def make_model(src_vocab, tgt_vocab, N=6,
     # Initialize parameters with Glorot / fan_avg.
     for p in model.parameters():
         if p.dim() > 1:
-            nn.init.xavier_uniform(p)
+            nn.init.xavier_uniform_(p)
     return model
 
 class Batch:
@@ -135,16 +136,20 @@ class LabelSmoothing(nn.Module):
         self.true_dist = None
         
     def forward(self, x, target):
-        assert x.size(1) == self.size
-        true_dist = x.data.clone()
-        true_dist.fill_(self.smoothing / (self.size - 2))
-        true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
-        true_dist[:, self.padding_idx] = 0
-        mask = torch.nonzero(target.data == self.padding_idx)
-        if mask.dim() > 0:
-            true_dist.index_fill_(0, mask.squeeze(), 0.0)
-        self.true_dist = true_dist
-        return self.criterion(x, Variable(true_dist, requires_grad=False))
+        try:
+            assert x.size(1) == self.size
+            target = target.to(dtype = torch.int64)
+            true_dist = x.data.clone()
+            true_dist.fill_(self.smoothing / (self.size - 2))
+            true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
+            true_dist[:, self.padding_idx] = 0
+            mask = torch.nonzero(target.data == self.padding_idx)
+            if mask.dim() > 0:
+                true_dist.index_fill_(0, mask.squeeze(), 0.0)
+            self.true_dist = true_dist
+            return self.criterion(x, Variable(true_dist, requires_grad=False))
+        except Exception as e:
+            print(e, x.shape, target.shape, x.dtype, target.dtype)
     
 def data_gen(V, batch, nbatches):
     "Generate random data for a src-tgt copy task."
@@ -170,7 +175,7 @@ class SimpleLossCompute:
         if self.opt is not None:
             self.opt.step()
             self.opt.optimizer.zero_grad()
-        return loss.data[0] * norm
+        return loss.data * norm
     
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
     memory = model.encode(src, src_mask)
@@ -186,6 +191,29 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
         ys = torch.cat([ys, 
                         torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
     return ys
+
+class MyIterator(data.Iterator):
+    def create_batches(self):
+        if self.train:
+            def pool(d, random_shuffler):
+                for p in data.batch(d, self.batch_size * 100):
+                    p_batch = data.batch(
+                        sorted(p, key=self.sort_key),
+                        self.batch_size, self.batch_size_fn)
+                    for b in random_shuffler(list(p_batch)):
+                        yield b
+            self.batches = pool(self.data(), self.random_shuffler)
+            
+        else:
+            self.batches = []
+            for b in data.batch(self.data(), self.batch_size,
+                                          self.batch_size_fn):
+                self.batches.append(sorted(b, key=self.sort_key))
+
+def rebatch(pad_idx, batch):
+    "Fix order in torchtext to match ours"
+    src, trg = batch.src.transpose(0, 1), batch.trg.transpose(0, 1)
+    return Batch(src, trg, pad_idx)
 
 class MultiGPULossCompute:
     "A multi-gpu loss compute and train function."
@@ -245,4 +273,5 @@ class MultiGPULossCompute:
             self.opt.step()
             self.opt.optimizer.zero_grad()
         return total * normalize
+    
     

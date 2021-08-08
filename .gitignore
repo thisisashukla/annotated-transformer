@@ -6,3 +6,5 @@ Created on Sat Aug  7 00:16:18 2021
 """
 
 .ipynb_checkpoints/
+data/
+__pycache__/
