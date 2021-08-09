@@ -13,6 +13,7 @@ import torch.nn.functional as F
 from torchtext.legacy import data
 from torch.autograd import Variable
 
+from train import *
 from layers import *
 from attention import *
 from transformer import *

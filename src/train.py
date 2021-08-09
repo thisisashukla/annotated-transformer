@@ -13,6 +13,8 @@ import torch.nn.functional as F
 from torchtext.legacy import data
 from torch.autograd import Variable
 
+from layers import *
+
 class Batch:
     "Object for holding a batch of data with mask during training."
     def __init__(self, src, trg=None, pad=0):
