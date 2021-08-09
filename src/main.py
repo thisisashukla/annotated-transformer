@@ -6,36 +6,15 @@ Created on Sat Aug  7 12:01:39 2021
 """
 import os
 import spacy
-from train import *
+from torchtext import datasets
 import matplotlib.pyplot as plt
 from torchtext.legacy import data
-from torchtext import datasets
 
-def data_gen(V, batch, nbatches):
-    "Generate random data for a src-tgt copy task."
-    for i in range(nbatches):
-        data = torch.from_numpy(np.random.randint(1, V, size=(batch, 10)))
-        data[:, 0] = 1
-        src = Variable(data, requires_grad=False)
-        tgt = Variable(data, requires_grad=False)
-        yield Batch(src, tgt, 0)
-        
-def greedy_decode(model, src, src_mask, max_len, start_symbol):
-    memory = model.encode(src, src_mask)
-    ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
-    for i in range(max_len-1):
-        out = model.decode(memory, src_mask, 
-                           Variable(ys), 
-                           Variable(subsequent_mask(ys.size(1))
-                                    .type_as(src.data)))
-        prob = model.generator(out[:, -1])
-        _, next_word = torch.max(prob, dim = 1)
-        next_word = next_word.data[0]
-        ys = torch.cat([ys, 
-                        torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
-    return ys
+from train import *
+from model import *
 
 if __name__ == '__main__':
+    print('h')
     '''
     opts = [NoamOpt(512, 1, 4000, None), 
             NoamOpt(512, 1, 8000, None),
@@ -160,6 +139,7 @@ if __name__ == '__main__':
         model_par.eval()
         loss = run_epoch((rebatch(pad_idx, b) for b in valid_iter), 
                           model_par, 
-                          MultiGPULossCompute(model.generator, criterion, 
-                          devices=devices, opt=None))
+                         SimpleLossCompute(model.generator, criterion, model_opt))
+#                           MultiGPULossCompute(model.generator, criterion, 
+#                           devices=devices, opt=None))
         print(loss)
