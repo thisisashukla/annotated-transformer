@@ -99,11 +99,11 @@ if __name__ == '__main__':
     EN_TEXT = data.Field(tokenize=tokenize_en)
     FR_TEXT = data.Field(tokenize=tokenize_fr, init_token = "<sos>", eos_token = "<eos>")
     
-    YOUR_PATH = '..//data//fr-en//fr-en'
+    YOUR_PATH = '../downloads'
     europarl_en = open(f"{YOUR_PATH}/europarl-v7.fr-en.en", encoding='utf-8').read().split('\n')
     europarl_fr = open(f"{YOUR_PATH}/europarl-v7.fr-en.fr", encoding='utf-8').read().split('\n')
 
-    if os.path.exists('../data/train.csv') and os.path.exists('../data/train.csv'):
+    if os.path.exists('./data/train.csv') and os.path.exists('./data/train.csv'):
         print('exists')
     else:
         import pandas as pd
@@ -118,13 +118,13 @@ if __name__ == '__main__':
         from sklearn.model_selection import train_test_split
         # create train and validation set 
         train, val = train_test_split(df, test_size=0.1)
-        train.to_csv("../data/train.csv", index=False)
-        val.to_csv("../data/val.csv", index=False)
+        train.to_csv("./data/train.csv", index=False)
+        val.to_csv("./data/val.csv", index=False)
     
     # associate the text in the 'English' column with the EN_TEXT field, # and 'French' with FR_TEXT
     print('creating dataset')
     data_fields = [('src', EN_TEXT), ('trg', FR_TEXT)]
-    train,val = data.TabularDataset.splits(path='../data', train='train_.csv', 
+    train,val = data.TabularDataset.splits(path='./data', train='train_.csv', 
                                            validation='val_.csv', format='csv', fields=data_fields)
 
     FR_TEXT.build_vocab(train, val)
@@ -148,7 +148,6 @@ if __name__ == '__main__':
                             repeat=False, sort_key=lambda x: (len(x.src), len(x.trg)),
                             batch_size_fn=batch_size_fn, train=False)
     model_par = model#nn.DataParallel(model)
-    
     model_opt = NoamOpt(model.src_embed[0].d_model, 1, 2000,
             torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
     for epoch in range(10):
